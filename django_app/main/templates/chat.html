@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Chat</title>
+</head>
+<body>
+
+<h2>💬 AI Response</h2>
+
+{% if result %}
+    <div style="border:1px solid #ccc; padding:10px; margin-bottom:15px;">
+        <p><b>Answer:</b></p>
+        <p>{{ result.answer }}</p>
+    </div>
+
+    {% if result.audio %}
+        <h4>🔊 Audio Response:</h4>
+        <audio controls autoplay>
+            <source src="http://127.0.0.1:8000/{{ result.audio }}" type="audio/mpeg">
+        </audio>
+    {% endif %}
+{% else %}
+    <p>No response yet ❗</p>
+{% endif %}
+
+<hr>
+
+<!-- 🔥 BACK BUTTON -->
+<a href="/">
+    <button style="padding:8px 15px;">⬅ Back to Home</button>
+</a>
+
+<br><br>
+
+<!-- 🔥 ASK AGAIN (Better UX) -->
+<form method="get" action="/chat/">
+    <input type="text" name="query" placeholder="Ask another question..." required>
+
+    <br><br>
+
+    <label>Output:</label>
+    <select name="output_type">
+        <option value="text">Text</option>
+        <option value="audio">Audio</option>
+    </select>
+
+    <br><br>
+
+    <button type="submit">Ask Again</button>
+</form>
+
+</body>
+</html>

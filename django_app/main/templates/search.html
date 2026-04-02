@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Search</title>
+</head>
+<body>
+
+<h2>Search Memory</h2>
+
+<form method="get">
+    <input type="text" name="query">
+    <button type="submit">Search</button>
+</form>
+
+{% if results %}
+    <h3>Results:</h3>
+    {% for item in results %}
+        <p><b>Content:</b> {{ item.content }}</p>
+        <p><b>Summary:</b> {{ item.summary }}</p>
+        <p><b>Tags:</b> {{ item.tags }}</p>
+        <hr>
+    {% endfor %}
+{% endif %}
+
+<br>
+<a href="/">Back</a>
+
+</body>
+</html>

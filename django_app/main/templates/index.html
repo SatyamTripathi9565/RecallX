@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RecallX AI Brain</title>
+</head>
+<body>
+
+<h1>RecallX AI Brain 🧠</h1>
+
+<!-- ================= TEXT INPUT ================= -->
+<h3>📝 Text Input</h3>
+<form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="input_type" value="text">
+    <textarea name="memory" rows="5" cols="50" placeholder="Enter memory..."></textarea><br><br>
+    <button type="submit">Save Text</button>
+</form>
+
+<hr>
+
+<!-- ================= AUDIO ================= -->
+<h3>🎤 Real-time Audio</h3>
+
+<button onclick="startRecording()">Start Recording</button>
+<button onclick="stopRecording()">Stop Recording</button>
+
+<p id="audioStatus"></p>
+
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <input type="hidden" name="input_type" value="audio">
+    <input type="file" id="audioFile" name="audio_file" hidden>
+    <button type="submit">Save Audio</button>
+</form>
+
+<hr>
+
+<!-- ================= VIDEO ================= -->
+<h3>🎥 Real-time Video</h3>
+
+<button onclick="startVideo()">Start Video</button>
+<button onclick="stopVideo()">Stop Video</button>
+
+<br><br>
+<video id="preview" width="300" autoplay muted></video>
+
+<p id="videoStatus"></p>
+
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <input type="hidden" name="input_type" value="video">
+    <input type="file" id="videoFile" name="video_file" hidden>
+    <button type="submit">Save Video</button>
+</form>
+
+<hr>
+
+<!-- ================= RESPONSE ================= -->
+{% if data %}
+<h3>Response:</h3>
+<p><b>Summary:</b> {{ data.summary }}</p>
+<p><b>Tags:</b> {{ data.tags }}</p>
+{% endif %}
+
+<hr>
+
+<!-- ================= 🔥 AI CHAT ================= -->
+<h3>💬 Recall your Memory</h3>
+
+<form method="get" action="/chat/">
+    <input type="text" name="query" placeholder="Ask something..." required>
+
+    <br><br>
+
+    <label>Select Output:</label>
+    <select name="output_type">
+        <option value="text">Text</option>
+        <option value="audio">Audio</option>
+    </select>
+
+    <br><br>
+
+    <button type="submit">Recall</button>
+</form>
+
+<!-- ================= AUDIO SCRIPT ================= -->
+<script>
+let mediaRecorder;
+let audioChunks = [];
+let audioStream;
+
+async function startRecording() {
+    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    mediaRecorder = new MediaRecorder(audioStream);
+    audioChunks = [];
+
+    mediaRecorder.ondataavailable = e => {
+        if (e.data.size > 0) audioChunks.push(e.data);
+    };
+
+    mediaRecorder.start();
+    document.getElementById("audioStatus").innerText = "🎤 Recording...";
+}
+
+function stopRecording() {
+    if (!mediaRecorder || mediaRecorder.state === "inactive") {
+        alert("Recording already stopped ❌");
+        return;
+    }
+
+    mediaRecorder.stop();
+
+    mediaRecorder.onstop = () => {
+        const blob = new Blob(audioChunks, { type: 'audio/webm' });
+        const file = new File([blob], "recording.webm");
+
+        const dt = new DataTransfer();
+        dt.items.add(file);
+
+        document.getElementById("audioFile").files = dt.files;
+
+        audioStream.getTracks().forEach(track => track.stop());
+
+        document.getElementById("audioStatus").innerText = "✅ Audio ready!";
+    };
+}
+</script>
+
+<!-- ================= VIDEO SCRIPT ================= -->
+<script>
+let videoRecorder;
+let videoChunks = [];
+let videoStream;
+
+async function startVideo() {
+    videoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+
+    document.getElementById("preview").srcObject = videoStream;
+
+    videoRecorder = new MediaRecorder(videoStream);
+    videoChunks = [];
+
+    videoRecorder.ondataavailable = e => {
+        if (e.data.size > 0) videoChunks.push(e.data);
+    };
+
+    videoRecorder.start();
+    document.getElementById("videoStatus").innerText = "🎥 Recording...";
+}
+
+function stopVideo() {
+    if (!videoRecorder || videoRecorder.state === "inactive") {
+        alert("Recording already stopped ❌");
+        return;
+    }
+
+    videoRecorder.stop();
+
+    videoRecorder.onstop = () => {
+        const blob = new Blob(videoChunks, { type: 'video/webm' });
+        const file = new File([blob], "video.webm");
+
+        const dt = new DataTransfer();
+        dt.items.add(file);
+
+        document.getElementById("videoFile").files = dt.files;
+
+        videoStream.getTracks().forEach(track => track.stop());
+
+        document.getElementById("videoStatus").innerText = "✅ Video ready!";
+    };
+}
+</script>
+
+</body>
+</html>
