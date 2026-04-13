@@ -1,18 +1,11 @@
-import os
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from pymongo import MongoClient
 
-# Step 1: Get project root directory (RecallX)
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MONGO_URL = "mongodb+srv://jyoti:RecallX@cluster0.skjdft0.mongodb.net/?retryWrites=true&w=majority"
 
-# Step 2: Create full path for database file
-db_path = os.path.join(BASE_DIR, "data", "memory.db")
+client = MongoClient(MONGO_URL)
 
-# Step 3: Create engine
-engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
+db = client["recallx"]
 
-# Step 4: Create session
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Step 5: Base class
-Base = declarative_base()
+# Collections
+memory_collection = db["memories"]
+recording_collection = db["recordings"]

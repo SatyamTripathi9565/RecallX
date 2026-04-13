@@ -1,11 +1,7 @@
-from sqlalchemy import Column, Integer, String
-from database import Base
+from pydantic import BaseModel
 
-class Memory(Base):
-    __tablename__ = "memories"
-
-    id = Column(Integer, primary_key=True)
-    content = Column(String)
-    summary = Column(String)
-    embedding = Column(String)
-    tags = Column(String)
+class Memory(BaseModel):
+    content: str
+    summary: str
+    embedding: str
+    tags: str

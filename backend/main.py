@@ -1,20 +1,10 @@
-from fastapi import FastAPI, Depends, BackgroundTasks
+from fastapi import UploadFile, File
+from fastapi import FastAPI
+from database import memory_collection, recording_collection
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
-from fastapi.staticfiles import StaticFiles
 
-from database import SessionLocal, engine
-from models import Base, Memory
-from ai_engine import summarize_text, generate_answer, text_to_speech
-
-# Create tables
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
-
-# 🔥 Serve media (for audio)
-app.mount("/media", StaticFiles(directory="media"), name="media")
-
 
 # =========================
 # ✅ Pydantic Model
@@ -24,160 +14,65 @@ class MemoryInput(BaseModel):
 
 
 # =========================
-# ✅ DB Dependency
+# 🏠 HOME
 # =========================
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+@app.get("/")
+def home():
+    return {"message": "Server running 🚀"}
 
 
 # =========================
-# 🔥 Background Processing
-# =========================
-def process_memory(mem_id: int, text: str):
-    db = SessionLocal()
-
-    try:
-        mem = db.query(Memory).filter(Memory.id == mem_id).first()
-
-        if mem:
-            mem.summary = summarize_text(text)
-            db.commit()
-
-    finally:
-        db.close()
-
-
-# =========================
-# ✅ ADD MEMORY (FAST)
+# ➕ ADD MEMORY
 # =========================
 @app.post("/add")
-def add_memory(data: MemoryInput, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-
-    # 🔥 Instant save
-    mem = Memory(
-        content=data.text,
-        summary="processing...",
-        embedding="",
-        tags=""
-    )
-
-    db.add(mem)
-    db.commit()
-    db.refresh(mem)
-
-    # 🔥 Background processing
-    background_tasks.add_task(process_memory, mem.id, data.text)
-
-    return {"message": "Saved successfully ✅"}
-
-
-# =========================
-# 💬 CHAT API
-# =========================
-@app.post("/chat")
-def chat(query: str, output_type: str = "text", db: Session = Depends(get_db)):
-
-    memories = db.query(Memory).all()
-
-    # 🔥 Simple context (fast)
-    context = "\n".join([m.content for m in memories[:5]])
-
-    answer = generate_answer(query, context)
-
-    response = {
-        "answer": answer
-    }
-
-    # 🔊 Optional audio
-    if output_type == "audio":
-        audio_path = text_to_speech(answer)
-        response["audio"] = audio_path
-
-    return response
+def add_memory(data: MemoryInput):
+    memory_collection.insert_one({
+        "content": data.text
+    })
+    return {"message": "Saved ✅"}
 
 
 # =========================
 # 📋 GET ALL MEMORIES
 # =========================
 @app.get("/memories")
-def all_memories(db: Session = Depends(get_db)):
-    memories = db.query(Memory).all()
+def all_memories():
+    memories = list(memory_collection.find({}, {"_id": 0}))
+    return memories
 
-    return [
-    {
-        "id": m.id,              # 🔥 YE LINE ADD KAR
-        "content": m.content,
-        "summary": m.summary
-    }
-    for m in memories
-]
 
 # =========================
-# 🔍 SEARCH API
+# 🔍 SEARCH
 # =========================
 @app.get("/search")
-def search(query: str, db: Session = Depends(get_db)):
+def search(query: str):
+    memories = list(memory_collection.find({}, {"_id": 0}))
 
-    memories = db.query(Memory).all()
-
-    # 🔥 simple search (filter)
     results = [
-        {"content": m.content}
-        for m in memories
-        if query.lower() in m.content.lower()
+        m for m in memories
+        if query.lower() in m["content"].lower()
     ]
 
     return results
 
+
 # =========================
 # ❌ DELETE MEMORY
 # =========================
-@app.delete("/delete/{mem_id}")
-def delete_memory(mem_id: int, db: Session = Depends(get_db)):
-    mem = db.query(Memory).filter(Memory.id == mem_id).first()
+@app.delete("/delete/{content}")
+def delete_memory(content: str):
+    memory_collection.delete_one({"content": content})
+    return {"message": "Deleted ✅"}
 
-    if mem:
-        db.delete(mem)
-        db.commit()
-        return {"message": "Deleted ✅"}
-    else:
-        return {"error": "Not found"}
-    
 
-# =========================
-# 🔍 SEARCH API
-# =========================
-@app.get("/search")
-def search(query: str, db: Session = Depends(get_db)):
-    memories = db.query(Memory).all()
 
-    results = []
+@app.post("/upload_recording")
+async def upload_recording(file: UploadFile = File(...)):
+    content = await file.read()
 
-    for m in memories:
-        if query.lower() in m.content.lower():
-            results.append({
-                "id": m.id,
-                "content": m.content
-            })
+    recording_collection.insert_one({
+        "filename": file.filename,
+        "data": content
+    })
 
-    return results
-
-    # =========================
-# 🗑 DELETE MEMORY
-# =========================
-@app.delete("/delete/{mem_id}")
-def delete_memory(mem_id: int, db: Session = Depends(get_db)):
-
-    mem = db.query(Memory).filter(Memory.id == mem_id).first()
-
-    if not mem:
-        return {"error": "Memory not found"}
-
-    db.delete(mem)
-    db.commit()
-
-    return {"message": "Deleted successfully"}
+    return {"message": "Recording saved 🎥"}

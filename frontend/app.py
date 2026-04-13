@@ -1,9 +1,13 @@
+from datetime import datetime
 import streamlit as st
 import requests
 import speech_recognition as sr
 import cv2
 import numpy as np
 import pyautogui
+import threading
+
+
 
 # 🔥 PAGE CONFIG
 st.set_page_config(layout="wide", initial_sidebar_state="expanded")
@@ -60,8 +64,8 @@ def login():
                 st.rerun()
 
         with b3:
-            if st.button("Forgot"):
-                st.session_state.page = "forgot"
+            if st.button("Forgot Password"):
+                st.session_state.page = "forgot password"
                 st.rerun()
 
 # 📝 REGISTER
@@ -125,43 +129,113 @@ st.title("🧠 RecallX AI Brain")
 st.sidebar.title("📊 Dashboard")
 
 # 🎥 Screen Record States
+
+import threading
+
+# STATES
 if "recording" not in st.session_state:
     st.session_state.recording = False
 
-st.subheader("🎥 Screen Recorder")
+if "video_file" not in st.session_state:
+    st.session_state.video_file = None
 
-col1, col2 = st.columns(2)
 
-# ▶️ START
-with col1:
-    if st.button("▶️ Start Recording"):
-        st.session_state.recording = True
-        st.success("Recording Started")
-
-# ⏹ STOP
-with col2:
-    if st.button("⏹ Stop Recording"):
-        st.session_state.recording = False
-        st.warning("Recording Stopped")
-
-# 🎬 RECORD LOGIC
-if st.session_state.recording:
-
+# 🎬 RECORD FUNCTION (LIVE PREVIEW)
+def record_screen():
     screen_size = pyautogui.size()
-
     fourcc = cv2.VideoWriter_fourcc(*"XVID")
-    out = cv2.VideoWriter("output.avi", fourcc, 10.0, screen_size)
 
-    st.info("Recording in background...")
+    filename = "recording_" + datetime.now().strftime("%H%M%S") + ".avi"
+    out = cv2.VideoWriter(filename, fourcc, 10.0, screen_size)
 
-    for i in range(100):  # 100 frames approx (short demo)
+    frame_placeholder = st.empty()  # 🔥 LIVE PREVIEW BOX
+
+    while st.session_state.recording:
+        img = pyautogui.screenshot()
+        frame = np.array(img)
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        out.write(frame)
+
+        # 🔥 SHOW LIVE FRAME
+        frame_placeholder.image(frame)
+
+    out.release()
+    st.session_state.video_file = filename
+
+
+
+# STATES
+if "recording" not in st.session_state:
+    st.session_state.recording = False
+
+if "video_file" not in st.session_state:
+    st.session_state.video_file = None
+
+
+# 🎬 RECORD FUNCTION
+def record_screen():
+    screen_size = pyautogui.size()
+    fourcc = cv2.VideoWriter_fourcc(*"XVID")
+
+    # 🔥 UNIQUE FILE NAME
+    filename = "recording_" + datetime.now().strftime("%H%M%S") + ".avi"
+
+    out = cv2.VideoWriter(filename, fourcc, 10.0, screen_size)
+
+    while st.session_state.recording:
         img = pyautogui.screenshot()
         frame = np.array(img)
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         out.write(frame)
 
     out.release()
-    st.success("Saved as output.avi ✅")
+    st.session_state.video_file = filename
+
+
+# 🎥 UI
+st.subheader("🎥 Screen Recorder")
+
+col1, col2 = st.columns(2)
+
+# ▶️ START
+with col1:
+    if st.button("▶️ Start Recording", key="start_btn"):
+        if not st.session_state.recording:
+            st.session_state.recording = True
+            thread = threading.Thread(target=record_screen)
+            thread.start()
+            st.session_state.thread = thread
+            st.success("Recording Started")
+
+# ⏹ STOP
+if st.button("⏹ Stop Recording", key="stop_btn"):
+    st.session_state.recording = False
+
+    if "thread" in st.session_state:
+        st.session_state.thread.join()
+
+    st.warning("Recording Stopped")
+
+if st.session_state.video_file:
+    st.success(f"Saved: {st.session_state.video_file}")
+
+    video_file = open(st.session_state.video_file, "rb")
+    video_bytes = video_file.read()
+
+    st.video(video_bytes)    
+
+# 📥 DOWNLOAD
+if st.session_state.video_file:
+
+    st.write("File saved:", st.session_state.video_file)
+
+    with open(st.session_state.video_file, "rb") as f:
+        st.download_button(
+            "📥 Download Recording",
+            f,
+            file_name=st.session_state.video_file
+        )
 
 menu = st.sidebar.radio(
     "",
